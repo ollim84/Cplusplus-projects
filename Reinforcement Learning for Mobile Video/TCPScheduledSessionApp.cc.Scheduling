@@ -1,0 +1,330 @@
+//
+// Copyright 2011 Zarrar Yousaf (NEC)
+//
+// This library is free software, you can redistribute it and/or modify
+// it under  the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation;
+// either version 2 of the License, or any later version.
+// The library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// See the GNU Lesser General Public License for more details.
+//
+/**
+ *			Module Logic Outline
+ *			====================
+ *			1: Open a Connection with the peer after a specified time interval (tOpen).
+ *			This should be done in Stage 3 of the initialize() fn.
+ *
+ *			2. Perform a BIND operation
+ *
+*			3. Commence with establishing conenction with peer
+*				3.a: check if Connection type is specified as Active" or "Listen".
+*				3.b: if "Active; then call socket.connect()
+*				3.c: if NOT "Active", then LISTEN only, i.e., call socket.listenOnce().
+*
+*			4. Wait until the Connection gets ESTABLISHED.
+*				4.a: while waiting for cx establishment, send any other message that may be received during this time to the socket.processMessage() function
+*
+*			5. After connection is established send bytes
+*				5.a: Send the initBytesToSend
+*				5.b: wait till notification is received from the FS4VP module along with the specified bytesToSend. In the first version this is a const.
+*				5.c: each time bytes are sent do the following
+*					- decrement the remainingBytesToSend
+*					- check if the totalAppBytes != 0.
+*					- if the bytesToSend > remainingBytesToSend, then readjust bytesToSend = remainingBytesToSend
+*
+*			6. If the totalAppBytes == 0; then CLOSE the connection using the socket.close() method.
+ *
+ */
+
+#include "TCPScheduledSessionApp.h"
+#include "IPAddressResolver.h"
+
+#define MK_OPEN_CONNECTION 1000
+#define MK_SEND_DATA_TRIGGER 1001
+#define MK_FROM_FS4VP 1002
+#define MK_REGISTER_MSG 1004
+#define MK_DE_REGISTER_MSG 1005
+
+Define_Module(TCPScheduledSessionApp);
+
+TCPScheduledSessionApp::~TCPScheduledSessionApp()
+{};
+
+void TCPScheduledSessionApp::initialize(int stage)
+{
+	if (stage ==3)
+	{
+	EV<<"This is the initialize function !"<<endl;
+
+		packetsRcvd = indicationsRcvd = 0;
+	    bytesRcvd = bytesSent = 0;
+	    packetsSent = 0; //ZY 25.10.2011
+
+	    WATCH(packetsRcvd);
+	    WATCH(bytesRcvd);
+	    WATCH(indicationsRcvd);
+	    WATCH(packetsSent);
+	    WATCH(bytesSent);
+	    WATCH(fs4vpControl);
+	    WATCH(chunkSize);
+
+	    // parameters
+	    address = par("address");
+	    port = par("port");
+	  	connectAddress = par("connectAddress");
+	  	connectPort = par("connectPort");
+	    active = par("active");
+	    tOpen = par("tOpen");
+	    tSend = par("tSend");
+	    tClose = par("tClose");
+	    fs4vpControl = par("fs4vpControl");
+	    totalAppBytes = par("sendBytes");
+	    sendDataTriggerTime = par("transmitTrigger"); //in sim second TODO: make it variable to be specified from FS4VP module
+
+	    if(!fs4vpControl)
+	    {
+	       	bytesToSend = par("bytesToSend"); //TODO: make it variable and dictated from FS4VP
+		    remainingBytesToSend = totalAppBytes; //initializes the variable
+		    chunkSize = par("chunkSize");
+	    }
+
+//	    remainingBytesToSend = totalAppBytes; //initializes the variable
+
+//	    if(fs4vpControl==true) //true means that the application's tx method will be controlled by the FS4VP control module
+//	    {
+//		    cModule *fs4vp = getParentModule()->getSubmodule("fs4VP"); //get the pointer to the FS4VP module
+//		    registerWithScheduler(fs4vp);
+//	    }
+		socket.setOutputGate(gate("tcpOut")); //setting output gate (why?)
+		cMessage *openConnectionMsg = new cMessage("Open_Connection", MK_OPEN_CONNECTION);
+		scheduleAt(tOpen, openConnectionMsg);
+	}
+}
+
+/*
+ ** This fn enables the app to send relevant cntext information to the scheduler (e.g. FS4VP)
+*/
+void TCPScheduledSessionApp::registerWithScheduler(cModule *fs4vp)
+{
+	aci = new AppContext(); //application context information object
+	aci -> setAppIndex(this->getIndex());
+	aci ->setAppId(this->getId());
+	aci ->setFileSize(totalAppBytes);
+	aci->setRemainingFileSize(totalAppBytes); //initially, remainingFileSize = totalAppBytes
+	aci->setTxDuration(sendDataTriggerTime);
+
+
+	cMessage *regMsg = new cMessage("regMsg", MK_REGISTER_MSG);
+	regMsg->setControlInfo(aci);
+	sendDirect(regMsg, fs4vp, "directInput"); //send registration info
+	return;
+}
+
+
+void TCPScheduledSessionApp::handleMessage(cMessage *msg)
+{
+	EV<<"This is the handle message function !"<<endl;
+	if(msg->getKind() == MK_OPEN_CONNECTION)
+	{
+		EV<<"Time to issue OPEN Command at time"<<simTime()<<endl;
+		openConnection();
+		EV<<"Connection Open"<<endl; //DEBUG
+		//TODO cancelAndDelete(msg);
+	}
+	else if(msg->getKind() ==TCP_I_ESTABLISHED)
+	{
+		EV<<"Received ESTABLISH message - Connection accepted by peer"<<endl;
+		if (ev.isGUI()) getDisplayString().setTagArg("t",0,"connected");
+
+		if(fs4vpControl==true) //true means that the application's tx method will be controlled by the FS4VP control module
+	    {
+		    cModule *fs4vp = getParentModule()->getSubmodule("fs4VP"); //get the pointer to the FS4VP module
+		    registerWithScheduler(fs4vp);
+	    }
+	    else //TODO must activte this line int eh final version
+	    	createInitialTrigger(); //create self-timer (i.e., initializes MK-SEND_DATA_TRIGGER) to trigger the transmission of first burst of data
+	}
+
+	else if(msg->getKind() == MK_SEND_DATA_TRIGGER)
+	{
+		EV<<"Received trigger to send data chunk of size "<<chunkSize<<" at time: "<<simTime()<<endl;
+//		sendData(msg, sendDataTriggerTime, bytesToSend);
+		sendChunk(msg);
+	}
+
+	else if(msg->getKind() == MK_FROM_FS4VP)
+	{
+		EV<<"Received message "<<msg->getFullName()<<" from FS4VP module at time: "<<simTime()<<endl;
+		EV <<"1..Removing ContextInformation"<<endl;
+		ContextInformation *ci =check_and_cast<ContextInformation*> (msg->removeControlInfo());
+		EV<<"The total bytes to send is "<< ci ->getBytesToSend()<<endl;
+		EV<<"The transmit chunk size is "<< ci ->getChunkSize() <<endl;
+		EV<<"The transmit duration is " << ci->getTxWindow()<<endl;
+		EV<<"The inter chunk time is "<< ci->getIatChunk()<<endl;
+
+		sendData(ci->getBytesToSend(), ci ->getChunkSize(), ci->getIatChunk(), ci->getTxWindow());
+
+		EV<<"Deleting trigger message and context information pointer!!!"<<endl;
+		delete(msg);
+		delete(ci);
+	}
+	else
+		EV <<"Unknown message: "<<msg->getFullName()<<" : "<<msg->getKind()<<endl;
+}
+
+/**
+ * This function initiates an Active or Passive connection with the peer.
+ */
+void TCPScheduledSessionApp::openConnection()
+{
+	socket.bind(*address ? IPvXAddress(address) : IPvXAddress(), port);
+
+	    EV << "issuing OPEN command\n";
+	    if (ev.isGUI()) getDisplayString().setTagArg("t",0, active?"connecting":"listening");
+	    if (active)
+	        socket.connect(IPAddressResolver().resolve(connectAddress), connectPort);
+	    else
+	        socket.listenOnce();
+	    return;
+}
+
+void TCPScheduledSessionApp::createInitialTrigger()
+{
+	EV<<"Creating Initial Transmit Trigger"<<endl;
+	cMessage *sendDataTrigger = new cMessage("send_trigger", MK_SEND_DATA_TRIGGER);
+
+	if(totalAppBytes > 0)
+	{
+		EV<<"Creating timer"<<endl;
+		//simtime_t interval = 0.1; //can be a uniform(0.1, 0.5) here for example
+		//simtime_t nextSentTime = simTime()+interval;
+
+		scheduleAt(simTime(),sendDataTrigger);
+	}
+}
+
+void TCPScheduledSessionApp::sendChunk(cMessage *msg)
+{
+	if(totalAppBytes > 0 && remainingBytesToSend > 0)
+	{
+		EV<<"Sending "<<chunkSize<<" Bytes of data at time: "<<simTime()<<endl;
+		cPacket *dataPacket =new cPacket("Hi Dude");
+		dataPacket -> setByteLength(chunkSize);
+		bytesSent += chunkSize;
+		socket.send(dataPacket);
+		remainingBytesToSend -= chunkSize;
+		EV<<"Remaining Bytes To Send: "<< remainingBytesToSend <<"B"<<endl;
+
+//		simtime_t nxtTxTrigger = simTime()+interval; //next transmit trigger
+//		scheduleAt(nxtTxTrigger, triggerTimer);
+		scheduleAt(simTime()+ sendDataTriggerTime, msg);
+	}
+	else
+	{
+		EV <<"No more data to send - canceling trigger timer"<<endl;
+		cancelAndDelete(msg);
+
+		EV <<"Closing connection"<<endl;
+		socket.close();
+		if (ev.isGUI()) getDisplayString().setTagArg("t",0,"closing");
+	}
+}
+
+
+void TCPScheduledSessionApp::sendData(cMessage *triggerTimer, simtime_t interval, int bytesToSend)
+{
+	if(totalAppBytes > 0 && remainingBytesToSend > 0)
+	{
+		EV<<"Sending "<<bytesToSend<<" Bytes of data at time: "<<simTime()<<endl;
+		cPacket *dataPacket =new cPacket("Hi Dude");
+		dataPacket -> setByteLength(bytesToSend);
+		bytesSent += bytesToSend;
+		socket.send(dataPacket);
+		remainingBytesToSend -= bytesToSend;
+		EV<<"Remaining Bytes To Send: "<< remainingBytesToSend <<"B"<<endl;
+		//Schedule self-timer for the next burst of data - in future, this time should be calculated and conveyed by the FS4VP module.
+		//simtime_t interval;
+		simtime_t nxtTxTrigger = simTime()+interval; //next transmit trigger
+		scheduleAt(nxtTxTrigger, triggerTimer);
+	}
+	else
+	{
+		EV <<"No more data to send - canceling trigger timer"<<endl;
+		cancelAndDelete(triggerTimer);
+
+		EV <<"Closing connection"<<endl;
+		socket.close();
+		if (ev.isGUI()) getDisplayString().setTagArg("t",0,"closing");
+	}
+}
+
+/*
+ ** This overloaded function is called when the application is controlled by the FS4VP controller
+ */
+void TCPScheduledSessionApp::sendData(int bytesToSend, int chunkSize, double ict, simtime_t txTimeSlot)
+{
+	if(fs4vpControl)
+	{
+		remainingBytesToSend = bytesToSend; //initializes the variable
+			if(totalAppBytes > 0 && remainingBytesToSend > 0)
+			{
+				EV<<"Sending "<<bytesToSend<<" Bytes of data at time: "<<simTime()<<endl;
+				cPacket *dataPacket =new cPacket("Hi Dude");
+				dataPacket -> setByteLength(bytesToSend);
+				bytesSent += bytesToSend;
+				socket.send(dataPacket);
+				remainingBytesToSend -= bytesToSend;
+				EV<<"Remaining Bytes To Send: "<< remainingBytesToSend <<"B"<<endl;
+
+				//TODO: utilize the chinkSize, ict and txTimeSlot parameters to control the flow of data to the TCP
+				return;
+			}
+			else
+			{
+				EV <<"No more data to send - closing connection and sending de-register message"<<endl;
+				//TODO: send a de-register message to FS4VP module to inform of the session end and de-register from it
+				socket.close();
+				if (ev.isGUI()) getDisplayString().setTagArg("t",0,"closing");
+				return;
+			}
+	}
+}
+
+void TCPScheduledSessionApp::count(cMessage *msg)
+{
+    if(msg->isPacket())
+    {
+        if (msg->getKind()==TCP_I_DATA || msg->getKind()==TCP_I_URGENT_DATA)
+        {
+            packetsRcvd++;
+            bytesRcvd+=PK(msg)->getByteLength();
+        }
+        else
+        {
+            EV << "TCPSessionApp received unknown message (kind:" << msg->getKind() << ", name:" << msg->getName() << ")\n";
+        }
+    }
+    else
+    {
+        indicationsRcvd++;
+    }
+}
+
+
+void TCPScheduledSessionApp::finish()
+{
+    EV << getFullPath() << ": received " << bytesRcvd << " bytes in " << packetsRcvd << " packets\n";
+    recordScalar("bytesRcvd", bytesRcvd);
+    recordScalar("bytesSent", bytesSent);
+}
+
+void TCPScheduledSessionApp::receiveChangeNotification(int category, const cPolymorphic *details)
+{
+	Enter_Method_Silent();
+	EV <<"this is receieChangeNotification method"<<endl;
+	//empty
+}
+
+

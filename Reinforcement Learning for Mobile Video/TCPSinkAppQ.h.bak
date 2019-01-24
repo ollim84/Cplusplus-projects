@@ -1,0 +1,61 @@
+//
+// Copyright 2004 Andras Varga
+// Copyright 2011 Zarrar Yousaf (NEC)
+//
+// This library is free software, you can redistribute it and/or modify
+// it under  the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation;
+// either version 2 of the License, or any later version.
+// The library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// See the GNU Lesser General Public License for more details.
+//
+
+#ifndef __INET_TCPSINKAPPQ_H
+#define __INET_TCPSINKAPPQ_H
+
+#include <omnetpp.h>
+#include "INETDefs.h"
+
+
+
+
+/**
+ * Extends the TCPSinkApp wwith a queue. Accepts any number of incoming TCP connections, and queues the packets
+ * and periodically deques them. Models the playout buffer of a browser.
+ */
+class INET_API TCPSinkAppQ : public cSimpleModule
+{
+  protected:
+	cQueue playBuffer;	 	//ZY 24.10.2011
+	long playBufferSize; 	//ZY 25.10.2011
+	double startPlay; 		//ZY 25.10.2011
+    long bytesRcvd;
+    int segmentsRcvd;
+    int initAdvBufferSize;
+    int minAdvBufferSize;
+
+  protected:
+    virtual void initialize();
+    virtual void handleMessage(cMessage *msg);
+    virtual void finish();
+    virtual void emptyPlayBuffer();
+    virtual void createPlayTimer();
+
+    //statistics
+    cOutVector segmentsReceivedVec;
+    cOutVector playBufferSizeVec;
+
+
+    cOutVector playBufferSizeByteVec;
+    cOutVector playBufferDepletionVec;
+
+
+    int playBufferIncreaseRate;
+    int playBufferDepletionRate;
+};
+
+#endif
+
+

@@ -1,0 +1,140 @@
+#include "TCPSinkAppQ.h"
+#include "TCPSocket.h"
+#include "TCPCommand_m.h"
+
+#define MK_ADVANCE_SLIDE_TRACKER 200 	//ZY 25.10.2011
+
+
+Define_Module(TCPSinkAppQ);
+
+void TCPSinkAppQ::initialize()
+{
+    const char *address = par("address");
+    int port = par("port");
+    startPlay = par("startPlay");
+    initAdvBufferSize = par("initAdvBufferSize");
+    minAdvBufferSize = par("minAdvBufferSize");
+
+    playBuffer.setName("Playout_Buffer"); //cQueue used as a playout buffer
+
+    bytesRcvd = 0;
+    WATCH(bytesRcvd);
+
+    playBufferSize = 0; //ZY 25.10.2011
+    WATCH(playBufferSize); //ZY 25.10.2011
+
+    segmentsRcvd = 0;
+    WATCH(segmentsRcvd);
+    WATCH(initAdvBufferSize);
+    WATCH(minAdvBufferSize);
+
+    //Statistics
+    segmentsReceivedVec.setName("Total_Segments_Rcvd");
+    playBufferSizeVec.setName("Play_Buffer_Size");
+    playBufferSizeByteVec.setName("Play_Buffer_Size_Bytes");
+
+
+    TCPSocket socket;
+    socket.setOutputGate(gate("tcpOut"));
+    socket.bind(address[0] ? IPvXAddress(address) : IPvXAddress(), port);
+    socket.listen();
+}
+
+void TCPSinkAppQ::handleMessage(cMessage *msg)
+{
+    if (msg->getKind()==TCP_I_PEER_CLOSED)
+    {
+        // we close too
+        msg->setKind(TCP_C_CLOSE);
+        send(msg, "tcpOut");
+    }
+    else if (msg->getKind()==TCP_I_DATA || msg->getKind()==TCP_I_URGENT_DATA)
+    {
+        bytesRcvd += PK(msg)->getByteLength();
+
+        playBuffer.insert(msg);
+        playBufferSize++;
+        segmentsRcvd++;
+        segmentsReceivedVec.record(segmentsRcvd);
+        playBufferSizeByteVec.record(bytesRcvd);
+
+        //as soon as the play buffer gets filled with initial number of advance packets, the app should start playing it
+            if(segmentsRcvd == initAdvBufferSize)
+            	createPlayTimer(); //create the self-msg (timer) that will periodically trigger the app to pop out packets from teh playbuffer
+        //delete msg;
+
+        if (ev.isGUI())
+        {
+            char buf[32];
+            sprintf(buf, "rcvd: %ld bytes", bytesRcvd);
+            getDisplayString().setTagArg("t",0,buf);
+        }
+    }
+    else if(msg->getKind()==MK_ADVANCE_SLIDE_TRACKER)
+    {
+    	EV<<"Timer Message Received !"<<endl;
+    	emptyPlayBuffer();
+    	playBufferDepletionRate++;
+//    	playBufferDepletionVec.record(playBufferDepletionRate);
+
+    	scheduleAt(simTime()+startPlay, msg);
+    }
+    else
+    {
+        // must be data or some kind of indication -- can be dropped
+    	EV<<"Unknown Message, hence dropping without further processing";
+        delete msg;
+    }
+}
+
+void TCPSinkAppQ::createPlayTimer()
+{
+
+		cMessage *timer = new cMessage("playAdvance", MK_ADVANCE_SLIDE_TRACKER);
+		EV<<"Timer "<<timer->getName()<<" of type "<<timer->getKind()<<" created at time "<<simTime()<<endl;
+		EV<<"Scheduling the timer msg to trigger at"<<simTime()+startPlay<<endl;
+		scheduleAt(simTime()+startPlay, timer);
+		return;
+}
+
+
+void TCPSinkAppQ::emptyPlayBuffer()
+//this function models the playing of a progressively video downloaded content
+{
+	EV<<"Entering the emptyPlayBuffer routine at time "<<simTime()<<" and creating the timer\n"<<endl;;
+	if(!playBuffer.isEmpty() && (playBuffer.length() > minAdvBufferSize))
+	{
+    	EV <<"Playing the Content - Popping video packet from the playBuffer)";
+//	    	playBufferSizeVec.record(playBuffer.getLength());
+    	cPacket *pkt = PK(playBuffer.pop()); //returns the pointer to the first element in the queue
+    	EV<<"About to delete packet with pointer value"<< pkt <<" id:"<<pkt->getId()<<"timestamp: "<<pkt->getTimestamp()<<"pointerId: "<<&pkt<<endl;
+    	delete pkt;
+    	playBufferSize--;
+    	playBufferSizeVec.record(playBufferSize);
+    //	if(playBufferSize < minAdvBufferSize)
+    		//suspend the playmessage
+
+    	//delete PK(playBuffer.pop());
+	}
+	else if(!playBuffer.isEmpty() && (playBuffer.length() <= minAdvBufferSize))
+	{
+		EV <<"Pausing the content play !!"<<endl;
+		//suspend/cwancel the playtimer, and reschedule when the playbuffer size increases above the minAdvThreshold
+	}
+	else if(playBuffer.isEmpty())
+
+	{
+		EV <<"Play Buffer is Empty !!"<<endl;
+	}
+
+
+
+return;
+}
+
+
+void TCPSinkAppQ::finish()
+{
+    recordScalar("bytesRcvd", bytesRcvd);
+}
+
