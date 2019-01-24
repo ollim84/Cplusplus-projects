@@ -4,3 +4,7 @@ language.
 
 The simulation model included models for the Resource Management System (RMS) of a super computing data centre, super computing clients,
 energy models for different components of a server, and statistics collector.
+
+Notable publications:
+https://link.springer.com/article/10.1007/s00450-011-0189-6
+
