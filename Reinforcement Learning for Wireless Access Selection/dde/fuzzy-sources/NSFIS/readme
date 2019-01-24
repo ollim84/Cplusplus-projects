@@ -1,0 +1,6 @@
+1.set the LD_LIBRARY_PATH 
+
+	export LD_LIBRARY_PATH=lib  
+2.run
+    ./nsfis -ap 2 3 4
+    

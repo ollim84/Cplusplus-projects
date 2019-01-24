@@ -1,0 +1,50 @@
+==================================
+===How to use nsfis in Python=====
+==================================
+
+1.set the LD_LIBRARY_PATH 
+$export LD_LIBRARY_PATH=lib  
+
+2.run python
+$python
+
+3. import module nsfis
+>>>import nsfis
+
+4. run clasification
+>>>nsfis.nsfis(0,1,2,3)
+      
+    
+===================================
+======== nsfis parameters =========
+===================================
+index = nsfis(op,arg1,arg2,arg3)
+
+op = select which clasification is used
+
+0 = Access Point Classification 
+1 = Mobile Node Classification
+2 = Network Selection Classifcation
+ 
+AP option (ready)
+=========
+arg1 = number of clients connected to the access point  0..24
+arg2 = available bandwidth / maximum bandwidth  0..1
+arg3 = % packet losses  0.100
+index = result of classification 0...1
+
+MN option (ready)
+=========
+arg1 = signal strength 0..100
+arg2 = interface energy consumption  0..100
+arg3 = battery level 0..100
+index = result of classification 0...1
+
+NS option   (not ready)
+=========
+arg1 = AP index
+arg2 = MN index  
+arg3 = seeds/leeches 
+index = result of classification 0...1
+
+

@@ -1,0 +1,208 @@
+Directory structure
+----------------------
+
+-lib   : contains the fuzzylite library (libfuzzylite) to run NSFIS
+
+-include : contains all the include files necessary  
+	-fuzzylite  : include files from fuzzylite
+
+-src  : Contains source codes for the different algorithms
+       		(fisAP,fisMN,fisNS,nsfis)
+
+-gui  : Folder for the GUI implementation of NSFIS
+	- ui
+	-tmp	
+	-gui
+	-src	
+  
+-dist : contains all the files necessaries to run NSFIS
+	-lib
+
+=========================================================================
+===================HOWTO run NSFIS C++ version===========================
+=========================================================================
+In directory dist
+
+1.set the LD_LIBRARY_PATH 
+
+	export LD_LIBRARY_PATH=lib  
+2.run
+    ./nsfis -ap 2 3 4
+
+===================================
+======== nsfis usage ==============
+===================================
+
+	./nsfis -ap|-mn|-ns arg1 arg2 arg3
+
+        -ap: Access Point Classification
+        -mn: Mobile Node Classification
+        -ns: Network Selection Classification
+ 
+AP option 
+=========
+arg1 = number of clients connected to the access point  0..24
+arg2 = available bandwidth / maximum bandwidth  0..1
+arg3 = % packet losses  0.100
+index = result of classification 0...1
+
+MN option 
+=========
+arg1 = signal strength 0..100
+arg2 = interface energy consumption  0..100
+arg3 = battery level 0..100
+index = result of classification 0...1
+
+NS option   
+=========
+arg1 = AP index
+arg2 = MN index  
+arg3 = seeds/leeches 
+index = result of classification 0...1
+
+=========================================================================
+===================HOWTO run NSFIS Python version========================
+=========================================================================
+In directory dist
+
+1.set the LD_LIBRARY_PATH 
+$export LD_LIBRARY_PATH=lib  
+
+2.run python
+$python
+
+3. import model sys
+>>> import sys
+
+4. add lib to the path 
+>>> sys.path.append("./lib")
+
+5. import module nsfis
+>>> import nsfis
+
+6. run clasification
+>>> nsfis.nsfis(0,1,2,3)
+      
+    
+===================================
+======== nsfis parameters =========
+===================================
+
+index = nsfis(op,arg1,arg2,arg3)
+
+op = select which clasification is used
+
+0 = Access Point Classification 
+1 = Mobile Node Classification
+2 = Network Selection Classifcation
+ 
+AP option 
+=========
+arg1 = number of clients connected to the access point  0..24
+arg2 = available bandwidth / maximum bandwidth  0..1
+arg3 = % packet losses  0.100
+index = result of classification 0...1
+
+MN option 
+=========
+arg1 = signal strength 0..100
+arg2 = interface energy consumption  0..100
+arg3 = battery level 0..100
+index = result of classification 0...1
+
+NS option   
+=========
+arg1 = AP index
+arg2 = MN index  
+arg3 = seeds/leeches 
+index = result of classification 0...1
+
+=========================================================================
+===================HOWTO run NSFIS GUI version===========================
+=========================================================================
+In directory dist
+
+1.set the LD_LIBRARY_PATH 
+$export LD_LIBRARY_PATH=lib  
+
+2.run gui
+./gui
+========================================================================
+====================USING GUI for modifying NSFIS rules=================
+========================================================================
+One can use the GUI version to see how the changes in the rules afect the results:
+Go to menu Examples > FIS_AP /FIS_MN / NSFIS  depending on which algorithm you want to modify.
+
+1.Edit directly from the viewer the rules. 
+2.Press red tick(ABC) to verify the rule is well writen.
+3.Press green tick
+4.Now is it possible to test moving the sliders for different values the output of the rules.
+5.Once you have the definitive rules you can proceed with HOWTO modify NSFIS 
+
+
+As the GUI doesn't keep the changes made in the rules. 
+If you want to make this changes permanently you have to modify the following file:
+gui>src>MainWindowController.cpp
+
+Go to the corresponding algorithm function: (loadFIS_AP(), loadFIS_MN(), loadNSFIS())
+and edit the rules you change.
+
+  rule1->parse("if Energy is LOW then Health is BAD", model());
+
+After all the necessary files are modified:
+
+In gui directory
+ 1.run make 
+  $ make
+	   			
+New gui version is created in NSFIS>dist directory.
+
+
+
+=========================================================================
+======================HOWTO modify NSFIS=================================
+=========================================================================
+Directory content
+-src
+ -fisAP.cpp  (AccessPoint FIS)
+ -fisMN.cpp  (Mobile Node FIS)
+ -fisNS.cpp  (Network Selection FIS)
+ -nsfis.cpp  (program who gather all three algorithms to use) 
+ -main.cpp   (main program for Cli version)
+ -nsfis.i    (Swig definition of nsfis.cpp file)
+ 
+
+To modify the differents FIS go to the corresponding file in src (fisAP.cpp, fisMN.cpp, fisNS.cpp)
+and modify FIS_* corresponding function.
+
+To modify the rules go to the RULES block on the file and change, delete or add new rules.
+
+ 	block->addRule(new fl::MamdaniRule("if Users is LOW  and Load is LOW and Losses is LOW then AP is EXCELLENT", engine));
+
+For more information on how to define rules go to fuzzylite manual.
+
+ATENTION : In case you add new parameters to the algorithms update nsfis.cpp file and also nsfis.i (see swig on how to define .i files)
+==========
+
+
+After all the necessary files are modified:
+
+In NSFIS directory
+ 1.run make 
+  $ make
+
+ 2.run swig.sh
+  $ sh swig.sh
+
+New nsfis (C++ and python version) are created in NSFIS>dist directory.
+
+=========================================================================
+=====================BEFORE STARTING=====================================
+=========================================================================
+packages needed
+
+-swig (i used 1.3.40)  (for python version)
+-python (i used 2.6.5) (for python version) 
+-python-dev            (for python version) 
+-qt4-designer (for GUI version)
+

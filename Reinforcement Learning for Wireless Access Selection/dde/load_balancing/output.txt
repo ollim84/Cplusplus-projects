@@ -1,0 +1,101 @@
+No interference:
+
+Client ranking:
+Signal strength: 99
+RSSI(dBm): -51
+Noise(dBm): -110
+SNR(dB): 59.000
+wirelessHostLearning[0] input: 	4.028	2.000	99.000	59.000	-> output: 0.614
+Signal strength: 93
+RSSI(dBm): -72
+Noise(dBm): -110
+SNR(dB): 38.000
+wirelessHostLearning[1] input: 	4.028	2.000	93.000	38.000	-> output: 0.614
+PoA ranking:
+0A-AA-00-00-00-03 input: 	4.583	5.688	0.000	-> output: 4.626
+0A-AA-00-00-00-05 input: 	4.583	1.896	0.000	-> output: 4.608
+0A-AA-00-00-00-14 input: 	4.583	5.688	0.000	-> output: 4.626
+0A-AA-00-00-00-17 input: 	4.583	1.944	0.000	-> output: 4.626
+0A-AA-00-00-00-19 input: 	4.583	5.688	0.000	-> output: 4.626
+Step 1 (action)
+returnEvents:
+
+Interference without HO suggestion:
+
+Client ranking:
+Signal strength: 99
+RSSI(dBm): -51
+Noise(dBm): -110
+SNR(dB): 59.000
+wirelessHostLearning[0] input: 	2.520	1.000	99.000	59.000	-> output: 0.357
+Signal strength: 93
+RSSI(dBm): -72
+Noise(dBm): -110
+SNR(dB): 38.000
+wirelessHostLearning[1] input: 	4.028	3.000	93.000	38.000	-> output: 1.000
+PoA ranking:
+0A-AA-00-00-00-03 input: 	4.583	5.688	0.000	-> output: 4.626
+0A-AA-00-00-00-05 input: 	4.583	1.928	0.000	-> output: 4.626
+0A-AA-00-00-00-14 input: 	4.583	5.688	0.000	-> output: 4.626
+0A-AA-00-00-00-17 input: 	2.514	1.856	0.000	-> output: 3.402
+0A-AA-00-00-00-19 input: 	4.583	5.688	0.000	-> output: 4.626
+Step 1 (action)
+returnEvents: 
+
+Algoritmin toiminta
+
+1. Käydään läpi tukiasemat joissa on ruuhkaa --> Congestion == 1
+
+2. Valitaan clientit ruuhkaisesta tukiasemasta subscription typen ja/tai HO potentiaalin perusteella (UseSubscriptionTypeInClientRanking =  true/false)
+
+//select a client or number of clients in congested PoAs and find appropriate PoA(s) for them for HO
+//go through the PoA ranking list from the last one to the first one and find the congested PoAs (should be at the end of the vector)	
+//go through the vector of clients in the order of ranking
+//check that the client belongs to the congested PoA
+
+//go through the PoA ranking list and search for the PoAs which are good candidates for HO
+
+3. Kapasiteetin tarkistus
+//skip the PoA if awailable capacity info is not awailable
+//skip the PoA if client requires more bandwidth than the proposed PoA can offer
+
+4. Onko PoA clientin PoA Listassa
+//client can see the proposed PoA --> clients_poa_grading[k].first == poa_ranking[j].first ??
+clients_poa_grading[k].first --> Clientin PoAListin tukiaseman MAC osoite?
+poa_ranking[j].first --> Tukiaseman MAC osoite, kun käydään läpi kaikki tukiasemia (niitä myös joita ei löydy clientin PoALististä)
+Clientin PoAList muodostetaan niistä tukiasemista, jotka client näkee (ClientPoAGrading) > 1.0
+
+
+5. Clientin arvio tukiasemasta on riittävän suuri --> ClientsPoAGradingLimit eli miten Client näkee tukiaseman!
+//client values the PoA high enough --> !clients_poa_grading_lower_than_allowed 
+
+6. PoA:n oma luokittelu on tarpeeksi hyvä --> PoARankingLimit eli PoAStatus
+//the PoA is a good candidate for the HO --> !poa_ranking_lower_than_allowed 
+
+Interference with HO rejection & same user classes:
+wirelessHostLearning[0] input: 	1.341	2.000	99.000	59.000	-> output: 1.708
+PoAList: 2;0A-AA-00-00-00-19,2.41983;0A-AA-00-00-00-17,1.34054;
+connectionState: 0A-AA-00-00-00-17,1.34054
+
+wirelessHostLearning[1] input: 	4.028	3.000	93.000	38.000	-> output: 1.000
+PoAList: 3;0A-AA-00-00-00-05,4.02766;0A-AA-00-00-00-19,4.02766;0A-AA-00-00-00-17,1.32034;
+connectionState: 0A-AA-00-00-00-05,4.02766
+
+PoA ranking:
+0A-AA-00-00-00-03 input: 	4.583	5.688	0.000	-> output: 4.626
+0A-AA-00-00-00-05 input: 	4.583	1.984	0.000	-> output: 4.626
+0A-AA-00-00-00-14 input: 	4.583	5.688	0.000	-> output: 4.626
+0A-AA-00-00-00-17 input: 	1.314	-0.120	1.000	-> output: 0.333
+0A-AA-00-00-00-19 input: 	4.583	5.688	0.000	-> output: 4.626
+HO for this client: wirelessHostLearning[0] 1.708
+0A-AA-00-00-00-19 rejected: client's PoA grading lower than allowed (2)
+
+Interference with HO acception & same user classes :
+
+poa_ranking[j].first: 0A-AA-00-00-00-19
+	0A-AA-00-00-00-19 accepted: (4.626, 2) 
+Step 1 (action)
+Handover recommendation wirelessHostLearning[0];0A-AA-00-00-00-19
+returnEvents: 
+Handover recommendation wirelessHostLearning[0];0A-AA-00-00-00-19
+
