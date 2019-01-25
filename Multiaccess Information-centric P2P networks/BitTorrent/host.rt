@@ -1,0 +1,9 @@
+ifconfig:
+name: ppp0	inet_addr: 1.8.0.2	MULTICAST POINTOPOINT	MTU: 4470	Metric: 1
+name: ppp1	inet_addr: 1.9.0.2	MULTICAST POINTOPOINT	MTU: 4470	Metric: 1
+ifconfigend.
+
+route:
+1.8.0.1		*		255.255.255.255	G	0	ppp0
+1.9.0.1		*		255.255.255.255	G	0	ppp1
+routeend.
