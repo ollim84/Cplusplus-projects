@@ -1,6 +1,6 @@
 //
 // Copyright 2011 Zarrar Yousaf (NEC)
-//
+// Copyright 2013 Olli Mämmelä (VTT)
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
 // as published by the Free Software Foundation; either version 2
