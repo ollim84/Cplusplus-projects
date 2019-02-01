@@ -5,6 +5,8 @@
  *      Author: Olli Mämmelä
  */
 
+// Copyright 2013 Olli Mämmelä (VTT)
+
 #ifndef RLAGENT_H_
 #define RLAGENT_H_
 
