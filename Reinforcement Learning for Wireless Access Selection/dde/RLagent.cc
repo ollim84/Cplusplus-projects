@@ -4,6 +4,7 @@
  *  Created on: Oct 1, 2012
  *      Author: Olli Mämmelä
  */
+// Copyright 2013 Olli Mämmelä (VTT)
 #include "RLagent.h"
 #include <string.h>
 #include <iostream>
